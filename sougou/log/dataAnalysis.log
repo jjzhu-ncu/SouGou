@@ -1,0 +1,18 @@
+'2016-10-21 21:59:53' - simpleLogger - INFO - [sougou_nbc.py:25]   - init SougouNBC
+'2016-10-21 21:59:53' - simpleLogger - INFO - [sougou_nbc.py:29]   - start get train data from ./data/user_tag_query.2W.TRAIN
+'2016-10-21 22:02:48' - simpleLogger - INFO - [sougou_nbc.py:25]   - init SougouNBC
+'2016-10-21 22:02:48' - simpleLogger - INFO - [sougou_nbc.py:29]   - start get train data from ./data/user_tag_query.2W.TRAIN
+'2016-10-21 22:03:48' - simpleLogger - INFO - [sougou_nbc.py:25]   - init SougouNBC
+'2016-10-21 22:03:48' - simpleLogger - INFO - [sougou_nbc.py:29]   - start get train data from ./data/user_tag_query.2W.TRAIN
+'2016-10-21 22:04:23' - simpleLogger - INFO - [sougou_nbc.py:25]   - init SougouNBC
+'2016-10-21 22:04:23' - simpleLogger - INFO - [sougou_nbc.py:29]   - start get train data from ./data/user_tag_query.2W.TRAIN
+'2016-10-21 22:04:59' - simpleLogger - INFO - [sougou_nbc.py:25]   - init SougouNBC
+'2016-10-21 22:04:59' - simpleLogger - INFO - [sougou_nbc.py:29]   - start get train data from ./data/user_tag_query.2W.TRAIN
+'2016-10-21 22:05:15' - simpleLogger - INFO - [sougou_nbc.py:25]   - init SougouNBC
+'2016-10-21 22:05:15' - simpleLogger - INFO - [sougou_nbc.py:29]   - start get train data from ./data/user_tag_query.2W.TRAIN
+'2016-10-21 22:10:41' - simpleLogger - INFO - [sougou_nbc.py:66]   - training age classify model
+'2016-10-21 22:25:35' - simpleLogger - INFO - [sougou_nbc.py:25]   - init SougouNBC
+'2016-10-21 22:25:35' - simpleLogger - INFO - [sougou_nbc.py:29]   - start get train data from ./data/user_tag_query.2W.TRAIN
+'2016-10-21 22:31:12' - simpleLogger - INFO - [sougou_nbc.py:66]   - training age classify model
+'2016-10-21 22:31:32' - simpleLogger - INFO - [sougou_nbc.py:69]   - train complete
+'2016-10-21 22:31:32' - simpleLogger - INFO - [sougou_nbc.py:70]   - training gender classify model
