@@ -25,13 +25,13 @@ def logger_conf():
 
 
 class SougouNBC():
-    def __init__(self, save_file_name='./data/sougou/result/sougou_result_nbc_no_seg.csv'):
+    def __init__(self, save_file_name='./data/sougou/result/sougou_result_nbc_seg.csv'):
         # self.seg_need = ['n', 'v', 'e', 'j', 'l']
-        self.mid_result_path = './data/sougou/result/nbc.no.seg.txt'
+        self.mid_result_path = './data/sougou/result/nbc.seg.txt'
         self.my_logger = logger_conf()
         self.my_logger.info('init SougouNBC')
-        self.train_file_name = './data/user_tag_query.2W.TRAIN'  # 2W.TRAIN.PRO.NO.SEG.jieba
-        self.test_file_name = './data/2W.TEST.pro.jieba'
+        self.train_file_name = './data/2W.TRAIN.pro.seg.jieba'  # 2W.TRAIN.PRO.NO.SEG.jieba
+        self.test_file_name = './data/2W.TEST.pro.seg.jieba'
         self.stop_word_file_name = './extra_dict/stop_words_ch.txt'
         self.age_model_save_path = './model/age_ber_no_seg.model'
         self.gender_model_save_path = './model/gender_ber_no_seg.model'
@@ -67,38 +67,21 @@ class SougouNBC():
         gender_input = []
         edu_input = []
         temp_list = []
-        rewrite_file_name = './data/sougou/rewrite4.csv'
         unused_words_file_name = './data/sougou/unused_words4.csv'
-        rewrite_file = open(rewrite_file_name, 'w', encoding='utf-8')
         unused_file = open(unused_words_file_name, 'w', encoding='utf-8')
-        rewrite_context = []
-        unused_context = []
         with open(self.train_file_name, mode='r', encoding='utf-8') as train_file:
             for line in train_file:
                 line = line.strip()
-                split_r = line.split('\t')
-                pesg_words = jieba.cut(','.join(split_r[4:]))
-                for pesg_word in pesg_words:
-                    if pesg_word not in self.stop_words \
-                            and len(pesg_word) > 1:
-                        temp_list.append(str(pesg_word))
-                    else:
-                        unused_context.append('%s \n' % pesg_word)
-                all_word = ' '.join(temp_list)
+                split_r = line.split(',')
+                all_word = split_r[4]
                 if split_r[1] != '0':
                     age_input.append((all_word, split_r[1]))
                 if split_r[2] != '0':
                     gender_input.append((all_word, split_r[2]))
                 if split_r[3] != '0':
                     edu_input.append((all_word, split_r[3]))
-                rewrite_context.append(' '.join(temp_list) + '\n')
+
                 temp_list.clear()
-        self.my_logger.info('rewrite word cut result to file: %s' % rewrite_file_name)
-        rewrite_file.writelines(rewrite_context)
-        self.my_logger.info('rewrite complete')
-        self.my_logger.info('rewrite unused words  to file: %s' % unused_words_file_name)
-        unused_file.writelines(unused_context)
-        self.my_logger.info('rewrite complete')
         end_time = datetime.datetime.now()
         self.my_logger.info('load train data complete. cost %d' % (end_time-start_time).seconds)
         return age_input, gender_input, edu_input
@@ -131,8 +114,8 @@ class SougouNBC():
         pre_data = []
         with open(self.test_file_name, mode='r', encoding='utf-8') as test_file:
             for line in test_file:
-                split_r = line.strip().split(' ')
-                pre_data.append((split_r[0], ' '.join(split_r[1:])))
+                split_r = line.strip().split(',')
+                pre_data.append((split_r[0], split_r[1]))
                 temp_list.clear()
         end_time = datetime.datetime.now()
         self.my_logger.info('load test data(%s) complete.cost %s seconds' %
@@ -178,8 +161,6 @@ class SougouNBC():
         edu_train_data, edu_train_target = self.get_train_data(self.edu_input)
         import numpy as np
         self.my_logger.info('start cross validation')
-
-        cv = ShuffleSplit(n=len(age_train_data), n_iter=10, test_size=0.3, random_state=0)
         self.my_logger.info('validation age models')
         age_result = cross_val_score(self.age_ber_nbc, age_train_data, age_train_target, cv=10)
         self.my_logger.info('use:%s alpha:%s age:%s' % ('BernoulliNB', '0.2', str(age_result)))
@@ -188,14 +169,14 @@ class SougouNBC():
 
         self.my_logger.info('validation edu models')
         edu_result = cross_val_score(self.edu_ber_nbc, edu_train_data, edu_train_target, cv=10)
-        self.my_logger.info('use:%s alpha:%s age:%s' % ('BernoulliNB', '0.2', str(edu_result)))
-        mid_result.append('use:%s alpha:%s mrean:%s age:%s\n' % ('BernoulliNB', '0.35',
+        self.my_logger.info('use:%s alpha:%s edu:%s' % ('BernoulliNB', '0.2', str(edu_result)))
+        mid_result.append('use:%s alpha:%s mrean:%s edu:%s\n' % ('BernoulliNB', '0.35',
                                                                  str(np.mean(edu_result)), str(edu_result)))
         self.my_logger.info('validation gender models')
         gender_result = cross_val_score(self.gender_ber_nbc, gender_train_data, gender_train_target, cv=10)
-        self.my_logger.info('use:%s alpha:%s age:%s' % ('BernoulliNB', '0.2', str(gender_result)))
-        mid_result.append('use:%s alpha:%s mrean:%s age:%s\n' % ('BernoulliNB', '0.2',
-                                                                 str(np.mean(gender_result)), str(gender_result)))
+        self.my_logger.info('use:%s alpha:%s gender:%s' % ('BernoulliNB', '0.2', str(gender_result)))
+        mid_result.append('use:%s alpha:%s mrean:%s gender:%s\n' % ('BernoulliNB', '0.2',
+                                                                    str(np.mean(gender_result)), str(gender_result)))
 
         self.my_logger.info('save mid result (%s)' % self.mid_result_path)
         mid_result_file = open(self.mid_result_path, 'w', encoding='utf-8')
@@ -212,7 +193,7 @@ class SougouNBC():
         edu_train_data, edu_train_target = self.get_train_data(self.edu_input)
         import numpy as np
         self.my_logger.info('start cross validation')
-        clf_name = ['BernoulliNB', 'MultinomialNB']
+        clf_name = ['BernoulliNB', 'BernoulliNB']
         cv = ShuffleSplit(n=len(age_train_data), n_iter=10, test_size=0.3, random_state=0)
 
         self.my_logger.info('validation age models')
@@ -222,7 +203,8 @@ class SougouNBC():
         temp_dic = {}
         for item in age_sort_models:
             age_result = cross_val_score(item[1], age_train_data, age_train_target, cv=10)
-            self.my_logger.info('use:%s alpha:%s age:%s' % (clf_name[1], item[0], str(age_result)))
+            self.my_logger.info('use:%s alpha:%s mrean:%s age:%s\n' % (clf_name[1], item[0],
+                                                                       str(np.mean(age_result)), str(age_result)))
             mid_result.append('use:%s alpha:%s mrean:%s age:%s\n' % (clf_name[1], item[0],
                                                                      str(np.mean(age_result)), str(age_result)))
             temp_dic[item[0]] = np.mean(age_result)

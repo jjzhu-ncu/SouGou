@@ -1,6 +1,8 @@
 __author__ = 'jjzhu'
 import jieba
 import jieba.posseg as pseg
+import datetime
+seg_need = ['n', 'v', 'e', 'j', 'l', 't', 'i', 'b', 's', 'a', 'r', 'd', 'z']
 
 
 def prepare_for_word2vec():
@@ -66,9 +68,10 @@ def prepare_train_data():
     if len(unused_context) != 0:
         open(unsuccessful, 'w', encoding='utf-8').writelines(unused_context)
 
+
 def prepare_train_data_seg():
     stop_words = load_stop_word()
-    seg_need = ['n', 'v', 'e', 'j', 'l', 't', 'i', 'b', 's', 'a', 'r', 'd', 'z']
+
     save_path = './data/2W.TRAIN.pro.seg.jieba'
     unsuccessful = './data/2W.TRAIN.uns.jieba'
     temp_list = []
@@ -95,6 +98,38 @@ def prepare_train_data_seg():
             unsuccessful_file.close()
             save_file.flush()
             save_file.close()
+
+
+def prepare_test_data_seg():
+    stop_words = load_stop_word()
+
+    save_path = './data/2W.TEST.pro.seg.jieba'
+    unsuccessful = './data/2W.TEST.uns.seg.jieba'
+    temp_list = []
+    unsuccessful_context = []
+    save_file = open(save_path, 'w', encoding='utf-8')
+    unsuccessful_file = open(unsuccessful, 'w', encoding='utf-8')
+    with open('./data/user_tag_query.2W.TEST', mode='r', encoding='utf-8') as train_file:
+            for line in train_file:
+                line = line.strip()
+                split_r = line.split('\t')
+                pesg_words = pseg.cut(','.join(split_r[1:]))
+                for pesg_word in pesg_words:
+                        if pesg_word.word not in stop_words \
+                                and len(pesg_word.word) > 1 \
+                                and pesg_word.flag[0] in seg_need:
+                            temp_list.append(str(pesg_word.word))
+                        else:
+                            unsuccessful_context.append('%s %s\n' % (pesg_word.word, pesg_word.flag))
+                save_file.writelines([','.join(split_r[:1])+','+' '.join(temp_list)+'\n'])
+                unsuccessful_file.writelines(['\t'.join(unsuccessful_context)])
+                temp_list.clear()
+                unsuccessful_context.clear()
+            unsuccessful_file.flush()
+            unsuccessful_file.close()
+            save_file.flush()
+            save_file.close()
+
 
 
 def prepare_test_data():
@@ -132,10 +167,52 @@ def delete_blank_line():
                 no_blank_lines.append(line)
     open(target, 'w', encoding='utf-8').writelines(no_blank_lines)
 
-import datetime
+
+def division_train_data_seg():
+    male_save_path = './data/2W.TRAIN.pro.male.seg.jieba'
+    female_save_path = './data/2W.TRAIN.pro.female.seg.jieba'
+    unknown_save_path = './data/2W.TRAIN.pro.unknown.seg.jieba'
+    males = []
+    females = []
+    unknown = []
+    with open('./data/2W.TRAIN.pro.seg.jieba', 'r', encoding='utf-8') as train_file:
+        for line in train_file:
+            split_r = line.strip().split(',')
+            if split_r[2] == '1':
+                males.append(line)
+            elif split_r[2] == '2':
+                females.append(line)
+            else:
+                unknown.append(line)
+        open(male_save_path, 'w', encoding='utf-8').writelines(males)
+        open(female_save_path, 'w', encoding='utf-8').writelines(females)
+        open(unknown_save_path, 'w', encoding='utf-8').writelines(unknown)
+
+
+def division_train_data_no_seg():
+    male_save_path = './data/2W.TRAIN.pro.male.jieba'
+    female_save_path = './data/2W.TRAIN.pro.female.jieba'
+    unknown_save_path = './data/2W.TRAIN.pro.unknown.jieba'
+    males = []
+    females = []
+    unknown = []
+    with open('./data/2W.TRAIN.pro.seg.jieba', 'r', encoding='utf-8') as train_file:
+        for line in train_file:
+            split_r = line.strip().split(',')
+            if split_r[2] == '1':
+                males.append(line)
+            elif split_r[2] == '2':
+                females.append(line)
+            else:
+                unknown.append(line)
+        open(male_save_path, 'w', encoding='utf-8').writelines(males)
+        open(female_save_path, 'w', encoding='utf-8').writelines(females)
+        open(unknown_save_path, 'w', encoding='utf-8').writelines(unknown)
+
+
 start = datetime.datetime.now()
 
-prepare_train_data_seg()
+division_train_data_no_seg()
 end = datetime.datetime.now()
 print('%s minute' % str((end-start).seconds/60))
 
