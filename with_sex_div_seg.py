@@ -1,18 +1,21 @@
 __author__ = 'jjzhu'
-import jieba
 import datetime
-import jieba.posseg as pseg
+
 from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer, CountVectorizer
-from sklearn.cross_validation import cross_val_predict, ShuffleSplit, cross_val_score
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import cross_val_score, GridSearchCV
 from sklearn.naive_bayes import BernoulliNB
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.naive_bayes import GaussianNB
+import numpy as np
+
 import logging
 import logging.config
 
 
 def logger_conf():
+    """
+    load basic logger configure
+    :return: configured logger
+    """
     import platform
     import os
     if platform.system() is 'Windows':
@@ -46,9 +49,6 @@ class SougouNBC():
         # self.age_input, self.gender_input, self.edu_input = self.get_data()
         self.gender_input, self.male_age_input, self.male_edu_input,\
         self.female_age_input, self.female_edu_input = self.get_data()
-        self.age_mul_nbc = Pipeline([('vect', TfidfVectorizer()), ('clf', MultinomialNB(alpha=1.0)), ])
-        self.gender_mul_nbc = Pipeline([('vect', TfidfVectorizer()), ('clf', MultinomialNB(alpha=1.0)), ])
-        self.edu_mul_nbc = Pipeline([('vect', TfidfVectorizer()), ('clf', MultinomialNB(alpha=1.0)), ])
 
         self.age_ber_nbc = Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB(alpha=0.2)), ])
         self.gender_ber_nbc = Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB(alpha=0.35)), ])
@@ -72,10 +72,6 @@ class SougouNBC():
         male_edu_input = []
         female_edu_input = []
         temp_list = []
-
-        unused_words_file_name = './data/sougou/unused_words4.csv'
-
-        unused_file = open(unused_words_file_name, 'w', encoding='utf-8')
         with open(self.gender_train, mode='r', encoding='utf-8') as train_file:
             for line in train_file:
                 line = line.strip()
@@ -183,8 +179,6 @@ class SougouNBC():
         edu_train_data, edu_train_target = self.get_train_data(self.edu_input)
         import numpy as np
         self.my_logger.info('start cross validation')
-
-        cv = ShuffleSplit(n=len(age_train_data), n_iter=10, test_size=0.3, random_state=0)
         self.my_logger.info('validation age models')
         age_result = cross_val_score(self.age_ber_nbc, age_train_data, age_train_target, cv=10)
         self.my_logger.info('use:%s alpha:%s age:%s' % ('BernoulliNB', '0.2', str(age_result)))
@@ -209,6 +203,25 @@ class SougouNBC():
         mid_result_file.close()
         self.my_logger.info('end')
 
+    def print_grid_search_info(self, pip, param):
+        self.my_logger.info('grid search.....')
+        self.my_logger.info('pipeline: ', [name for name, _ in pip.steps])
+        self.my_logger.info('parameters:')
+        self.my_logger.info(param)
+
+    def print_best_params(self, params, gs):
+        """
+        print best parameters
+        :param params: grid search parameters
+        :param gs: grid search result
+        :return: null
+        """
+        self.my_logger.info('Best score: %0.6f' % gs.best_score_)
+        self.my_logger.info('Best parameters set:')
+        best_parameters = gs.best_estimator_.get_params()
+        for param_name in sorted(params.keys()):
+            self.my_logger.info('\t%s: %r' % (param_name, best_parameters[param_name]))
+
     def validation(self):
         mid_result_file = open(self.mid_result_path, 'w', encoding='utf-8')
         mid_result = []
@@ -218,111 +231,50 @@ class SougouNBC():
         male_edu_train_data, male_edu_train_target = self.get_train_data(self.male_edu_input)
         female_age_train_data, female_age_train_target = self.get_train_data(self.female_age_input)
         female_edu_train_data, female_edu_train_target = self.get_train_data(self.female_edu_input)
-        import numpy as np
-        self.my_logger.info('start cross validation')
-        clf_name = ['BernoulliNB', 'MultinomialNB']
 
-        self.my_logger.info('validation male age models')
-        male_age_models = {str(i): Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB(alpha=i)), ])
-                           for i in np.arange(0.1, 0.45, 0.01)}
-        male_age_sort_models = sorted(male_age_models.items(), key=lambda elem: elem[0])
-        temp_dic = {}
-        max_dic = {}
-        for item in male_age_sort_models:
-            male_age_result = cross_val_score(item[1], male_age_train_data, male_age_train_target, cv=10)
-            self.my_logger.info('use:%s alpha:%s mrean:%s max:%s male age:%s\n' %
-                                (clf_name[1], item[0], str(np.mean(male_age_result)),
-                                 str(np.mean(male_age_result)), str(male_age_result)))
-            mid_result.append('use:%s alpha:%s mrean:%s max:%s male age:%s\n' %
-                              (clf_name[1], item[0], str(np.mean(male_age_result)),
-                               str(np.mean(male_age_result)), str(male_age_result)))
-            temp_dic[item[0]] = np.mean(male_age_result)
-            max_dic[item[0]] = np.max(male_age_result)
+        model_params = {
+            'vect__max_df': (0.5, 0.75, 1.0),
+            'vect__ngram_range': ((1, 1), (1, 2)),
+            'vect__use_idf': (True, False),
+            'vect__norm': ('l1', 'l2'),
+            'clf__alpha': [_ for _ in np.arange(0.1, 0.45, 0.01)],
+        }
 
-        mid_result.append('mean best: alpha:%s' % sorted(temp_dic.items(), key=lambda elem: elem[1])[-1][0])
-        mid_result.append('max best: alpha:%s' % sorted(max_dic.items(), key=lambda elem: elem[1])[-1][0])
-        temp_dic.clear()
-        max_dic.clear()
+        self.my_logger.info('grid search male age model')
+        male_age_model_pip = Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB()), ])
+        male_age_grid_search = GridSearchCV(male_age_model_pip, param_grid=model_params, n_jobs=-1, verbose=1)
+        self.print_grid_search_info(male_age_grid_search, model_params)
+        male_age_grid_search.fit(male_age_train_data, male_age_train_target)
+        self.print_best_params(model_params, male_age_grid_search)
 
-        self.my_logger.info('validation female age models')
-        female_age_models = {str(i): Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB(alpha=i)), ])
-                             for i in np.arange(0.1, 0.45, 0.01)}
-        female_age_sort_models = sorted(female_age_models.items(), key=lambda elem: elem[0])
-        temp_dic = {}
-        for item in female_age_sort_models:
-            female_age_result = cross_val_score(item[1], female_age_train_data, female_age_train_target, cv=10)
-            self.my_logger.info('use:%s alpha:%s mrean:%s max:%s female age:%s\n' %
-                                (clf_name[1], item[0], str(np.max(female_age_result)),
-                                 str(np.mean(female_age_result)), str(female_age_result)))
-            mid_result.append('use:%s alpha:%s mrean:%s max:%s female age:%s\n' %
-                              (clf_name[1], item[0], str(np.max(female_age_result)),
-                               str(np.mean(female_age_result)), str(female_age_result)))
-            temp_dic[item[0]] = np.mean(female_age_result)
-            max_dic[item[0]] = np.max(female_age_result)
-        mid_result.append('mean best: alpha:%s' % sorted(temp_dic.items(), key=lambda elem: elem[1])[-1][0])
-        mid_result.append('max best: alpha:%s' % sorted(max_dic.items(), key=lambda elem: elem[1])[-1][0])
-        temp_dic.clear()
-        max_dic.clear()
+        self.my_logger.info('grid search female age model')
+        female_age_model_pip = Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB()), ])
+        female_age_grid_search = GridSearchCV(female_age_model_pip, param_grid=model_params, n_jobs=-1, verbose=1)
+        self.print_grid_search_info(female_age_grid_search, model_params)
+        male_age_grid_search.fit(female_age_train_data, female_age_train_target)
+        self.print_best_params(model_params, female_age_grid_search)
 
-        self.my_logger.info('validation male edu models')
-        male_edu_models = {str(i): Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB(alpha=i)), ])
-                           for i in np.arange(0.1, 0.45, 0.01)}
-        male_edu_sort_models = sorted(male_edu_models.items(), key=lambda elem: elem[0])
+        self.my_logger.info('grid search male edu model')
+        male_edu_model_pip = Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB()), ])
+        male_edu_grid_search = GridSearchCV(male_edu_model_pip, param_grid=model_params, n_jobs=-1, verbose=1)
+        self.print_grid_search_info(male_edu_grid_search, model_params)
+        male_age_grid_search.fit(male_edu_train_data, male_edu_train_target)
+        self.print_best_params(model_params, male_edu_grid_search)
 
-        for item in male_edu_sort_models:
-            male_edu_result = cross_val_score(item[1], male_edu_train_data, male_edu_train_target, cv=10)
-            self.my_logger.info('use:%s alpha:%s mrean:%s max: %s male_edu:%s\n' %
-                              (clf_name[1], item[0], str(np.max(male_edu_result)),
-                               str(np.mean(male_edu_result)), str(male_edu_result)))
-            mid_result.append('use:%s alpha:%s mrean:%s max: %s male_edu:%s\n' %
-                              (clf_name[1], item[0], str(np.max(male_edu_result)),
-                               str(np.mean(male_edu_result)), str(male_edu_result)))
-            temp_dic[item[0]] = np.mean(male_edu_result)
-            max_dic[item[0]] = np.max(male_edu_result)
+        self.my_logger.info('grid search female edu model')
+        female_edu_model_pip = Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB()), ])
+        female_edu_grid_search = GridSearchCV(female_edu_model_pip, param_grid=model_params, n_jobs=-1, verbose=1)
+        self.print_grid_search_info(female_edu_grid_search, model_params)
+        male_age_grid_search.fit(female_edu_train_data, female_edu_train_target)
+        self.print_best_params(model_params, female_edu_grid_search)
 
-        mid_result.append('mean best: alpha:%s' % sorted(temp_dic.items(), key=lambda elem: elem[1])[-1][0])
-        mid_result.append('max best: alpha:%s' % sorted(max_dic.items(), key=lambda elem: elem[1])[-1][0])
-        temp_dic.clear()
-        max_dic.clear()
+        self.my_logger.info('grid search gender model')
+        gender_model_pip = Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB()), ])
+        gender_grid_search = GridSearchCV(gender_model_pip, param_grid=model_params, n_jobs=-1, verbose=1)
+        self.print_grid_search_info(gender_grid_search, model_params)
+        male_age_grid_search.fit(gender_train_data, gender_train_target)
+        self.print_best_params(model_params, gender_grid_search)
 
-        self.my_logger.info('validation female edu models')
-        female_edu_models = {str(i): Pipeline([('vect', TfidfVectorizer()), ('clf', BernoulliNB(alpha=i)), ])
-                             for i in np.arange(0.1, 0.45, 0.01)}
-        female_edu_sort_models = sorted(female_edu_models.items(), key=lambda elem: elem[0])
-
-        for item in female_edu_sort_models:
-            female_edu_result = cross_val_score(item[1], female_edu_train_data, female_edu_train_target, cv=10)
-            self.my_logger.info('use:%s alpha:%s mrean:%s max:%s female_edu:%s\n' %
-                              (clf_name[1], item[0], str(np.max(female_edu_result)),
-                               str(np.mean(female_edu_result)), str(female_edu_result)))
-            mid_result.append('use:%s alpha:%s mrean:%s max:%s female_edu:%s\n' %
-                              (clf_name[1], item[0], str(np.max(female_edu_result)),
-                               str(np.mean(female_edu_result)), str(female_edu_result)))
-            temp_dic[item[0]] = np.mean(female_edu_result)
-            max_dic[item[0]] = np.max(female_edu_result)
-
-        mid_result.append('mean best: alpha:%s' % sorted(temp_dic.items(), key=lambda elem: elem[1])[-1][0])
-        mid_result.append('max best: alpha:%s' % sorted(max_dic.items(), key=lambda elem: elem[1])[-1][0])
-        temp_dic.clear()
-        max_dic.clear()
-
-        self.my_logger.info('validation gender models')
-        gender_models = {str(i): Pipeline([('vect', TfidfVectorizer()), ('clf', MultinomialNB(alpha=i)), ])
-                         for i in np.arange(0.1, 0.45, 0.01)}
-        gender_sort_models = sorted(gender_models.items(), key=lambda elem: elem[0])
-        for item in gender_sort_models:
-            gender_result = cross_val_score(item[1], gender_train_data, gender_train_target, cv=10)
-            self.my_logger.info('use:%s alpha:%s mrean:%s gender:%s' % (clf_name[1], item[0],
-                                                                        str(np.mean(gender_result)), str(gender_result)))
-            mid_result.append('use:%s alpha:%s mrean:%s gender:%s\n' % (clf_name[1], item[0],
-                                                                        str(np.mean(gender_result)), str(gender_result)))
-            temp_dic[item[0]] = np.mean(gender_result)
-            max_dic[item[0]] = np.max(gender_result)
-        mid_result.append('mean best: alpha:%s' % sorted(temp_dic.items(), key=lambda elem: elem[1])[-1][0])
-        mid_result.append('max best: alpha:%s' % sorted(max_dic.items(), key=lambda elem: elem[1])[-1][0])
-        temp_dic.clear()
-        max_dic.clear()
-        self.my_logger.info('validation edu models')
 
         self.my_logger.info('save mid result (%s)' % self.mid_result_path)
 
